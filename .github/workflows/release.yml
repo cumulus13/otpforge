@@ -29,7 +29,7 @@ jobs:
         with:
           changelog: CHANGELOG.md
           title: otpforge $version
-          branch: main
+          branch: master
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
