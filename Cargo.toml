@@ -1,6 +1,6 @@
 [package]
 name = "otpforge"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 rust-version = "1.85"
 authors = ["Hadi Cahyadi <cumulus13@gmail.com>"]
@@ -21,6 +21,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "otpforge"
 path = "src/main.rs"
+
+[[bin]]
+name = "otp"
+path = "src/bin/otp.rs"
 
 [dependencies]
 argon2 = "0.5"

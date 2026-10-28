@@ -37,8 +37,13 @@ or the `otpauth://...` URI your QR reader gives you:
 otpforge add pypi                       # prompts (hidden) for the secret or URI; prints the first code
 otpforge add pypi 'otpauth://totp/PyPI:me?secret=ABCD...&issuer=PyPI'   # or pass it directly
 otpforge pypi                           # login code (unique prefixes work: `otpforge py`)
+otpforge pypi -c                        # ...and copy it to the clipboard
+otpforge pypi | xclip -selection clipboard   # or pipe it (stdout is just the code; `| clip` on Windows, `| pbcopy` on macOS)
 otpforge list --codes                   # all accounts with live codes
 ```
+
+Every command is also available under the short alias `otp` (e.g. `otp pypi -c`). `-c/--copy` works with `NAME`,
+`code` and `add` and uses `clip` (Windows), `pbcopy` (macOS) or `wl-copy` / `xclip` / `xsel` (Linux/BSD).
 
 `add` prints the current code immediately, which is what the site asks for to finish enrolling.
 Passing a secret as an argument leaves it in your shell history; prefer the prompt or `echo SECRET | otpforge add NAME`.
@@ -83,6 +88,126 @@ otpforge completions zsh > _otpforge
 | 0         | Success / code valid            |
 | 1         | Code invalid (`verify`)         |
 | 2         | Usage or runtime error          |
+
+## How it works
+
+### Overview
+
+```mermaid
+flowchart LR
+    user([You]) --> cli["otpforge / otp<br/>CLI"]
+
+    cli -->|"add · list · remove · export"| vault
+    cli -->|"NAME · code · verify"| vault
+    cli -->|"generate --save"| vault
+    cli -->|generate| gen["Secret + backup codes<br/>OS CSPRNG"]
+
+    vault[("vault.json<br/>plaintext or encrypted")] --> totp["TOTP engine<br/>RFC 6238"]
+    gen --> uri["otpauth:// URI"]
+    uri --> qr["QR code<br/>terminal or SVG"]
+    totp --> out["Code on stdout"]
+    out --> clip["Clipboard with -c"]
+    out --> pipe["Pipe to xclip, clip or pbcopy"]
+```
+
+[![Architecture 1](https://i.ibb.co/zDGqB92/architecture1.jpg)](https://i.ibb.co/zDGqB92/architecture1.jpg)
+
+
+### Enrol once, log in any time
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor You
+    participant App as otpforge
+    participant Vault as vault.json
+    participant Site as Service (e.g. PyPI)
+
+    Site->>You: Shows QR code and text secret
+    You->>App: otpforge add pypi (secret or otpauth URI)
+    App->>App: Parse and validate
+    App->>Vault: Save entry (atomic write, mode 0600)
+    App-->>You: First code
+    You->>Site: Enter code to finish enrolling
+
+    Note over You,Site: Later, at login
+    You->>App: otpforge pypi -c
+    App->>Vault: Load (decrypt if encrypted)
+    App-->>You: Current code, copied to clipboard
+    You->>Site: Paste code
+```
+
+[![Architecture 2](https://i.ibb.co/p6zgQrdV/architecture2.jpg)](https://i.ibb.co/p6zgQrdV/architecture2.jpg)
+
+### Vault encryption
+
+```mermaid
+flowchart TB
+    subgraph save["Save an encrypted vault"]
+        p1["Passphrase"] --> kdf1["Argon2id<br/>64 MiB, 3 passes, random 16-byte salt"]
+        kdf1 --> key1["256-bit key"]
+        entries["Accounts as JSON"] --> aead1["ChaCha20-Poly1305<br/>random 12-byte nonce"]
+        key1 --> aead1
+        aead1 --> file1["vault.json<br/>KDF header, nonce, ciphertext"]
+    end
+
+    subgraph load["Load an encrypted vault"]
+        file2["vault.json"] --> chk["Check KDF limits"]
+        p2["Passphrase<br/>prompt or OTPFORGE_PASSPHRASE"] --> kdf2["Argon2id"]
+        chk --> kdf2
+        kdf2 --> aead2["Decrypt and verify tag"]
+        aead2 -->|ok| mem["Accounts in memory<br/>zeroized on drop"]
+        aead2 -->|"tag mismatch"| fail["Error: wrong passphrase or corrupted vault"]
+    end
+```
+
+[![Architecture 3](https://i.ibb.co/xtww12m5/architecture3.jpg)](https://i.ibb.co/xtww12m5/architecture3.jpg)
+
+A fresh salt and nonce are generated on every save, and files are replaced atomically (temp file + rename).
+
+### Library modules
+
+```mermaid
+flowchart BT
+    cli["main.rs / bin/otp.rs<br/>CLI (clap)"] --> vault
+    cli --> uri
+    cli --> qr
+    cli --> backup
+    cli --> clipboard
+    cli --> otp
+    vault --> uri
+    vault --> otp
+    vault --> secret
+    uri --> otp
+    uri --> secret
+    otp --> secret
+```
+
+[![Architecture 4](https://i.ibb.co/6JcnCgM8/architecture4.jpg)](https://i.ibb.co/6JcnCgM8/architecture4.jpg)
+
+All modules share the `error` module.
+
+### Release pipeline
+
+```mermaid
+flowchart LR
+    tag["git tag vX.Y.Z"] --> verify["Tag must equal Cargo.toml version"]
+    verify --> rel["Create GitHub release<br/>notes from CHANGELOG.md"]
+    rel --> build
+
+    subgraph build["Build matrix: otpforge + otp"]
+        direction TB
+        l1["Linux x86_64 gnu and musl"]
+        l2["Linux aarch64 gnu"]
+        m1["macOS x86_64 and aarch64"]
+        w1["Windows x86_64, i686, aarch64"]
+    end
+
+    build --> assets["tar.gz / zip + SHA-256"]
+    assets --> pub["cargo publish to crates.io"]
+```
+
+[![Architecture 5](https://i.ibb.co/m5mnX5r0/architecture5.jpg)](https://i.ibb.co/m5mnX5r0/architecture5.jpg)
 
 ## Library
 

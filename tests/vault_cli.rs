@@ -233,3 +233,79 @@ fn vault_file_is_private() {
     let mode = std::fs::metadata(&env.vault).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o600);
 }
+
+#[test]
+fn otp_alias_binary_works() {
+    let version = Command::new(env!("CARGO_BIN_EXE_otp"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(version.status.success());
+    let env = Env::new("alias");
+    env.run(&["add", "pypi", PYPI_URI]);
+    let out = Command::new(env!("CARGO_BIN_EXE_otp"))
+        .env("OTPFORGE_VAULT", &env.vault)
+        .args(["code", "pypi", "--time", "59"])
+        .output()
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "94287082");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn copy_flag_uses_clipboard_tool() {
+    use std::os::unix::fs::PermissionsExt;
+    let env = Env::new("clip");
+    env.run(&["add", "pypi", PYPI_URI]);
+
+    let bin_dir = env.dir.join("bin");
+    std::fs::create_dir_all(&bin_dir).unwrap();
+    let sink = env.dir.join("clipboard.txt");
+    let tool = bin_dir.join("xclip");
+    std::fs::write(&tool, "#!/bin/sh\ncat > \"$OTPFORGE_TEST_CLIP\"\n").unwrap();
+    std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let run = |args: &[&str]| {
+        env.cmd()
+            .env("PATH", format!("{}:/usr/bin:/bin", bin_dir.display()))
+            .env("OTPFORGE_TEST_CLIP", &sink)
+            .env_remove("WAYLAND_DISPLAY")
+            .args(args)
+            .output()
+            .unwrap()
+    };
+
+    // NAME shorthand, flag after the name
+    let o = run(&["pypi", "-c"]);
+    assert!(o.status.success());
+    let printed = out(&o).trim().to_owned();
+    assert_eq!(std::fs::read_to_string(&sink).unwrap(), printed);
+
+    // flag before the name, and `code NAME -c`
+    std::fs::remove_file(&sink).unwrap();
+    assert!(run(&["-c", "pypi"]).status.success());
+    assert_eq!(std::fs::read_to_string(&sink).unwrap(), printed);
+    std::fs::remove_file(&sink).unwrap();
+    let o = run(&["code", "pypi", "--time", "59", "-c"]);
+    assert!(o.status.success());
+    assert_eq!(std::fs::read_to_string(&sink).unwrap(), "94287082");
+
+    // `add -c` copies the first code
+    std::fs::remove_file(&sink).unwrap();
+    assert!(run(&["add", "second", PYPI_URI, "-c"]).status.success());
+    assert_eq!(std::fs::read_to_string(&sink).unwrap().len(), 8);
+
+    // no clipboard tool: code is still printed, exit status is 2
+    let o = env
+        .cmd()
+        .env("PATH", "/nonexistent")
+        .env_remove("WAYLAND_DISPLAY")
+        .args(["pypi", "-c"])
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(2));
+    assert_eq!(out(&o).trim().len(), 8);
+
+    // -c before a subcommand is rejected
+    assert_eq!(run(&["-c", "list"]).status.code(), Some(2));
+}

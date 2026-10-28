@@ -25,6 +25,7 @@
 #![warn(missing_docs)]
 
 pub mod backup;
+pub mod clipboard;
 pub mod error;
 pub mod otp;
 pub mod qr;

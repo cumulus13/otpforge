@@ -91,6 +91,9 @@ pub enum Error {
     /// JSON (de)serialisation failure.
     #[error("format error: {0}")]
     Json(#[from] serde_json::Error),
+    /// Clipboard unavailable or failed.
+    #[error("clipboard error: {0}")]
+    Clipboard(String),
     /// I/O failure.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

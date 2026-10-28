@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::Shell;
 use clap_color_help::default_styles;
+use clap_complete::Shell;
 use clap_version_flag::colorful_version;
 use serde::Serialize;
 use zeroize::Zeroizing;
@@ -22,7 +22,7 @@ use zeroize::Zeroizing;
 use otpforge::otp::{self, Algorithm, TotpParams};
 use otpforge::secret::{Secret, DEFAULT_SECRET_BYTES, MAX_SECRET_BYTES, MIN_SECRET_BYTES};
 use otpforge::vault::{self, Entry, Vault};
-use otpforge::{backup, qr, uri, Error, Result};
+use otpforge::{backup, clipboard, qr, uri, Error, Result};
 
 /// Secure 2FA (TOTP) authenticator and secret key generator.
 ///
@@ -42,6 +42,9 @@ struct Cli {
     /// Vault file holding saved accounts [default: <config dir>/otpforge/vault.json]
     #[arg(long, global = true, env = "OTPFORGE_VAULT", value_name = "PATH")]
     vault: Option<PathBuf>,
+    /// Copy the code to the clipboard (only for `NAME`; subcommands take their own -c)
+    #[arg(short = 'c', long)]
+    copy: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -165,12 +168,15 @@ struct AddArgs {
     /// Replace an existing account of the same name
     #[arg(long)]
     force: bool,
+    /// Copy the first code to the clipboard
+    #[arg(short = 'c', long)]
+    copy: bool,
 }
 
 #[derive(Args, Debug)]
 struct ListArgs {
     /// Also show the current code and its remaining validity
-    #[arg(short, long)]
+    #[arg(long)]
     codes: bool,
 }
 
@@ -248,6 +254,9 @@ struct CodeArgs {
     /// Also print the remaining validity of the code
     #[arg(short, long)]
     verbose: bool,
+    /// Copy the code to the clipboard
+    #[arg(short = 'c', long)]
+    copy: bool,
     /// Unix timestamp to use instead of the current time
     #[arg(long)]
     time: Option<u64>,
@@ -426,7 +435,26 @@ fn write_private(path: &Path, contents: &str, force: bool) -> Result<()> {
     Ok(())
 }
 
-fn print_code(entry: &Entry, now: u64, verbose: bool) -> Result<()> {
+fn copy_to_clipboard(code: &str) -> Result<()> {
+    clipboard::copy(code)?;
+    eprintln!("copied to clipboard");
+    Ok(())
+}
+
+fn bin_name() -> String {
+    std::env::args_os()
+        .next()
+        .and_then(|a| {
+            Path::new(&a)
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+        })
+        .filter(|n| n.eq_ignore_ascii_case("otp"))
+        .map(|_| "otp".to_owned())
+        .unwrap_or_else(|| "otpforge".to_owned())
+}
+
+fn print_code(entry: &Entry, now: u64, verbose: bool, copy: bool) -> Result<()> {
     let code = entry.code(now)?;
     let remaining = otp::seconds_remaining(now, entry.period);
     let mut out = io::stdout().lock();
@@ -437,6 +465,10 @@ fn print_code(entry: &Entry, now: u64, verbose: bool) -> Result<()> {
         if io::stderr().is_terminal() {
             eprintln!("valid for {remaining}s");
         }
+    }
+    drop(out);
+    if copy {
+        copy_to_clipboard(&code)?;
     }
     Ok(())
 }
@@ -506,6 +538,10 @@ fn add(args: &AddArgs, path: &Path) -> Result<()> {
         entry.code(now)?,
         otp::seconds_remaining(now, entry.period)
     )?;
+    drop(out);
+    if args.copy {
+        copy_to_clipboard(&entry.code(now)?)?;
+    }
     Ok(())
 }
 
@@ -615,10 +651,10 @@ fn export(args: &ExportArgs, path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn show(name: &str, path: &Path) -> Result<()> {
+fn show(name: &str, path: &Path, copy: bool, verbose: bool) -> Result<()> {
     let vault = load_vault(path)?;
     let entry = vault.find(name)?;
-    print_code(entry, unix_now()?, false)
+    print_code(entry, unix_now()?, verbose, copy)
 }
 
 fn code(args: &CodeArgs, path: &Path) -> Result<()> {
@@ -628,7 +664,7 @@ fn code(args: &CodeArgs, path: &Path) -> Result<()> {
     };
     if let Some(name) = &args.name {
         let vault = load_vault(path)?;
-        return print_code(vault.find(name)?, now, args.verbose);
+        return print_code(vault.find(name)?, now, args.verbose, args.copy);
     }
     let secret = read_secret(&args.source)?;
     let params = args.otp.params()?;
@@ -642,6 +678,10 @@ fn code(args: &CodeArgs, path: &Path) -> Result<()> {
         )?;
     } else {
         writeln!(out, "{value}")?;
+    }
+    drop(out);
+    if args.copy {
+        copy_to_clipboard(&value)?;
     }
     Ok(())
 }
@@ -793,8 +833,13 @@ fn vault_cmd(cmd: &VaultCommand, path: &Path) -> Result<()> {
 fn run(cli: Cli) -> Result<ExitCode> {
     if let Command::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
-        clap_complete::generate(*shell, &mut cmd, "otpforge", &mut io::stdout());
+        clap_complete::generate(*shell, &mut cmd, bin_name(), &mut io::stdout());
         return Ok(ExitCode::SUCCESS);
+    }
+    if cli.copy && !matches!(cli.command, Command::External(_)) {
+        return Err(Error::Usage(
+            "-c before a subcommand only applies to `NAME`; put it after the subcommand".into(),
+        ));
     }
     let path = vault_path(&cli)?;
     match &cli.command {
@@ -806,19 +851,37 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Command::Code(a) => code(a, &path)?,
         Command::Verify(a) => return verify(a, &path),
         Command::Vault(c) => vault_cmd(c, &path)?,
-        Command::External(args) => match args.as_slice() {
-            [name] => show(name, &path)?,
-            _ => return Err(Error::Usage(
-                "unknown command; run `otpforge --help` (or `otpforge NAME` for a saved account)"
-                    .into(),
-            )),
-        },
+        Command::External(args) => {
+            let mut copy = cli.copy;
+            let mut verbose = false;
+            let mut name: Option<&str> = None;
+            for arg in args {
+                match arg.as_str() {
+                    "-c" | "--copy" => copy = true,
+                    "-v" | "--verbose" => verbose = true,
+                    opt if opt.starts_with('-') => {
+                        return Err(Error::Usage(format!(
+                            "unknown option '{opt}'; run `otpforge --help`"
+                        )))
+                    }
+                    n if name.is_none() => name = Some(n),
+                    _ => {
+                        return Err(Error::Usage(
+                            "unknown command; run `otpforge --help` (or `otpforge NAME` for a saved account)"
+                                .into(),
+                        ))
+                    }
+                }
+            }
+            let name = name.ok_or_else(|| Error::Usage("missing account name".into()))?;
+            show(name, &path, copy, verbose)?
+        }
         Command::Completions { .. } => unreachable!("handled above"),
     }
     Ok(ExitCode::SUCCESS)
 }
 
-fn main() -> ExitCode {
+pub(crate) fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     if args.len() == 2 && (args[1] == "-V" || args[1] == "--version") {
         let version = colorful_version!();

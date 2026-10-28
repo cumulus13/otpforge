@@ -3,9 +3,9 @@ name: Security audit
 on:
   push:
     branches: [master]
-    paths: ["**/Cargo.toml"]
+    paths: ["**/Cargo.toml", "**/Cargo.lock"]
   pull_request:
-    paths: ["**/Cargo.toml"]
+    paths: ["**/Cargo.toml", "**/Cargo.lock"]
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
