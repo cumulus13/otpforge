@@ -23,7 +23,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -38,7 +38,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -60,7 +60,7 @@ jobs:
           - macos-latest
           - macos-15-intel
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --all-targets
@@ -70,7 +70,7 @@ jobs:
     name: MSRV (1.85)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Pinned via the `toolchain` input (not the action ref) so Dependabot cannot bump it.
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -92,7 +92,7 @@ jobs:
           - { os: windows-latest, target: aarch64-pc-windows-msvc }
           - { os: macos-latest, target: x86_64-apple-darwin }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -111,7 +111,7 @@ jobs:
           - { target: x86_64-linux-android,    file_arch: "x86-64" }        # emulators, Chromebooks
           - { target: i686-linux-android,      file_arch: "Intel 80386" }   # x86 emulators
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -135,7 +135,7 @@ jobs:
     env:
       RUSTDOCFLAGS: -D warnings
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo doc --no-deps
@@ -144,7 +144,7 @@ jobs:
     name: Package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo package

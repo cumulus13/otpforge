@@ -16,7 +16,7 @@ jobs:
     name: Create release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify tag matches Cargo.toml version
         run: |
@@ -50,7 +50,7 @@ jobs:
           - { os: windows-latest,   target: i686-pc-windows-msvc }
           - { os: windows-latest,   target: aarch64-pc-windows-msvc }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -81,7 +81,7 @@ jobs:
           - { target: x86_64-linux-android }    # emulators, Chromebooks
           - { target: i686-linux-android }      # x86 emulators
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -110,7 +110,7 @@ jobs:
     needs: [upload-assets, upload-android]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - name: Publish
         run: cargo publish --allow-dirty
