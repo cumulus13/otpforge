@@ -68,9 +68,46 @@ jobs:
           include: README.md,LICENSE-MIT,LICENSE-APACHE,CHANGELOG.md
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  upload-android:
+    name: Build (${{ matrix.target }})
+    needs: create-release
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-linux-android }   # arm64-v8a: most phones, Termux on aarch64
+          - { target: armv7-linux-androideabi } # armeabi-v7a: Termux on armv7l / armv8l
+          - { target: x86_64-linux-android }    # emulators, Chromebooks
+          - { target: i686-linux-android }      # x86 emulators
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Configure Android NDK
+        run: bash .github/scripts/android-env.sh ${{ matrix.target }} 24
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }} --bins
+      - name: Package
+        run: |
+          set -euo pipefail
+          name="otpforge-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          stage="$(mktemp -d)"
+          cp "target/${{ matrix.target }}/release/otpforge" "target/${{ matrix.target }}/release/otp" \
+             README.md LICENSE-MIT LICENSE-APACHE CHANGELOG.md "$stage/"
+          mkdir -p dist
+          tar -czf "dist/${name}.tar.gz" -C "$stage" .
+          (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          ls -l dist
+      - name: Upload to release
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-crate:
     name: Publish to crates.io
-    needs: upload-assets
+    needs: [upload-assets, upload-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

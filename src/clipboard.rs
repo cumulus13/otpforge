@@ -1,5 +1,6 @@
 //! Best-effort system clipboard access via the platform's own tools
-//! (`clip` on Windows, `pbcopy` on macOS, `wl-copy` / `xclip` / `xsel` on Linux and BSD).
+//! (`clip` on Windows, `pbcopy` on macOS, `termux-clipboard-set` on Android/Termux,
+//! `wl-copy` / `xclip` / `xsel` on Linux and BSD).
 
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -18,7 +19,13 @@ fn tools() -> Vec<Tool> {
     vec![("pbcopy", &[])]
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "android")]
+fn tools() -> Vec<Tool> {
+    // Provided by `pkg install termux-api` together with the Termux:API app.
+    vec![("termux-clipboard-set", &[])]
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "android")))]
 fn tools() -> Vec<Tool> {
     let mut list: Vec<Tool> = Vec::new();
     if std::env::var_os("WAYLAND_DISPLAY").is_some() {
@@ -54,7 +61,7 @@ fn copy_with(tools: &[Tool], text: &str) -> Result<()> {
         }
     }
     Err(Error::Clipboard(last_failure.unwrap_or_else(|| {
-        "no clipboard tool found (install xclip, xsel or wl-clipboard)".into()
+        "no clipboard tool found (install xclip, xsel or wl-clipboard; on Termux: pkg install termux-api and install the Termux:API app)".into()
     })))
 }
 

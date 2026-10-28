@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-10-28
+
+### Added
+- Android / Termux support: prebuilt release archives for `aarch64-linux-android` (arm64-v8a), `armv7-linux-androideabi` (armeabi-v7a, Termux `armv7l`/`armv8l`), `x86_64-linux-android` and `i686-linux-android`, built against Android API 24+.
+- CI job that cross-builds and test-compiles all four Android targets with the NDK.
+- `-c` / `--copy` uses `termux-clipboard-set` on Android (`pkg install termux-api`).
+
 ## [0.1.8] - 2026-10-28
 
 ### Added

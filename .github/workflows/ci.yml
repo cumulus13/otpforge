@@ -96,6 +96,36 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --target ${{ matrix.target }}
 
+  android:
+    name: Android (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: aarch64-linux-android,   file_arch: "ARM aarch64" }   # arm64-v8a (most phones, Termux)
+          - { target: armv7-linux-androideabi, file_arch: "ARM, EABI5" }    # armeabi-v7a (armv7l / armv8l Termux)
+          - { target: x86_64-linux-android,    file_arch: "x86-64" }        # emulators, Chromebooks
+          - { target: i686-linux-android,      file_arch: "Intel 80386" }   # x86 emulators
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Configure Android NDK
+        run: bash .github/scripts/android-env.sh ${{ matrix.target }} 24
+      - run: cargo build --target ${{ matrix.target }} --bins
+      - run: cargo test --no-run --target ${{ matrix.target }}
+      - name: Verify binaries are Android (bionic) executables for the right CPU
+        run: |
+          for bin in otpforge otp; do
+            info="$(file "target/${{ matrix.target }}/debug/$bin")"
+            echo "$info"
+            grep -q "${{ matrix.file_arch }}" <<<"$info"
+            grep -q "/system/bin/linker" <<<"$info"
+          done
+
   docs:
     name: Docs
     runs-on: ubuntu-latest
@@ -119,7 +149,7 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [fmt, clippy, test, msrv, cross-check, docs, package]
+    needs: [fmt, clippy, test, msrv, cross-check, android, docs, package]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all jobs succeeded

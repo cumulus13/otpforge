@@ -18,7 +18,7 @@ backup codes. Also computes and verifies one-time codes (RFC 4226 / RFC 6238).
 - SHA-1 / SHA-256 / SHA-512, 6–8 digits, custom period; RFC 4226 / RFC 6238 test vectors
 - Secrets zeroized on drop, redacted in `Debug`, constant-time code comparison, no `unsafe`
 - Text or JSON output, shell completions, stable exit codes
-- Windows, Linux, macOS, x86-64 / ARM64 (CI-tested), pure Rust
+- Windows, Linux, macOS, **Android/Termux** (arm64, armv7, x86, x86-64), x86-64 / ARM64 (CI-tested), pure Rust
 
 ## Install
 
@@ -27,6 +27,36 @@ cargo install otpforge
 ```
 
 Prebuilt binaries for every platform are attached to each [GitHub release](https://github.com/cumulus13/otpforge/releases).
+
+### Android / Termux
+
+Prebuilt Android binaries (API 24+, i.e. Android 7.0 or newer) are attached to every release.
+Pick the one that matches `uname -m` inside Termux:
+
+| `uname -m`          | Release archive target      | ABI          |
+|---------------------|-----------------------------|--------------|
+| `aarch64`           | `aarch64-linux-android`     | arm64-v8a    |
+| `armv7l`, `armv8l`  | `armv7-linux-androideabi`   | armeabi-v7a  |
+| `x86_64`            | `x86_64-linux-android`      | x86_64       |
+| `i686`              | `i686-linux-android`        | x86          |
+
+```sh
+VER=v0.1.9   # see the Releases page for the latest tag
+case "$(uname -m)" in
+  aarch64)         T=aarch64-linux-android ;;
+  armv7l|armv8l)   T=armv7-linux-androideabi ;;
+  x86_64)          T=x86_64-linux-android ;;
+  i686|i386)       T=i686-linux-android ;;
+esac
+curl -fsSL "https://github.com/cumulus13/otpforge/releases/download/$VER/otpforge-$VER-$T.tar.gz" \
+  | tar -xz -C "$PREFIX/bin" otpforge otp
+```
+
+Or build inside Termux: `pkg install rust && cargo install otpforge`.
+For `-c/--copy` install the clipboard helper: `pkg install termux-api` and the Termux:API app.
+The vault lives in `~/.config/otpforge/vault.json` inside Termux; run `otpforge vault encrypt` since phone
+backups and other apps with storage access may reach it. Android binaries use Android's libc (bionic) and run in
+Termux or `adb shell`, not inside glibc chroots/proot distributions (use the `linux` archives there).
 
 ## Quick start: use it as your authenticator (e.g. PyPI)
 
@@ -201,6 +231,7 @@ flowchart LR
         l2["Linux aarch64 gnu"]
         m1["macOS x86_64 and aarch64"]
         w1["Windows x86_64, i686, aarch64"]
+        a1["Android aarch64, armv7, x86_64, i686 (NDK, API 24)"]
     end
 
     build --> assets["tar.gz / zip + SHA-256"]
