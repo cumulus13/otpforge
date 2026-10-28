@@ -39,7 +39,7 @@ use otpforge::{backup, clipboard, qr, uri, Error, Result};
     after_help = "Examples:\n  otpforge add pypi 'otpauth://totp/PyPI:me?secret=...'   save an account (secret or URI)\n  otpforge pypi                                           print the current login code\n  otpforge list --codes                                   show all accounts with codes"
 )]
 struct Cli {
-    /// Vault file holding saved accounts [default: <config dir>/otpforge/vault.json]
+    /// Vault file holding saved accounts [default: CONFIG_DIR/otpforge/vault.json]
     #[arg(long, global = true, env = "OTPFORGE_VAULT", value_name = "PATH")]
     vault: Option<PathBuf>,
     /// Copy the code to the clipboard (only for `NAME`; subcommands take their own -c)

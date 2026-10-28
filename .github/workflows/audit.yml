@@ -3,9 +3,9 @@ name: Security audit
 on:
   push:
     branches: [master]
-    paths: ["**/Cargo.toml", "**/Cargo.lock"]
+    paths: ["**/Cargo.toml"]
   pull_request:
-    paths: ["**/Cargo.toml", "**/Cargo.lock"]
+    paths: ["**/Cargo.toml"]
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Generate lockfile (Cargo.lock is not committed)
+        run: cargo generate-lockfile
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
