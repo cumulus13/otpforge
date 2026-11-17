@@ -109,7 +109,7 @@ jobs:
           - { target: aarch64-linux-android,   file_arch: "ARM aarch64" }   # arm64-v8a (most phones, Termux)
           - { target: armv7-linux-androideabi, file_arch: "ARM, EABI5" }    # armeabi-v7a (armv7l / armv8l Termux)
           - { target: x86_64-linux-android,    file_arch: "x86-64" }        # emulators, Chromebooks
-          - { target: i686-linux-android,      file_arch: "Intel 80386" }   # x86 emulators
+          - { target: i686-linux-android,      file_arch: "Intel i386" }   # x86 emulators
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
