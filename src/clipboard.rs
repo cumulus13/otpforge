@@ -45,7 +45,15 @@ fn run_tool(tool: &Tool, text: &str) -> std::io::Result<bool> {
         .stderr(Stdio::null())
         .spawn()?;
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(text.as_bytes())?;
+        // A tool that exits before reading its input closes the pipe; that is reported
+        // through its exit status below, not as a write error (which would be a race).
+        if let Err(e) = stdin.write_all(text.as_bytes()) {
+            if e.kind() != std::io::ErrorKind::BrokenPipe {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(e);
+            }
+        }
     }
     Ok(child.wait()?.success())
 }

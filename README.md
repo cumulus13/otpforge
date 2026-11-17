@@ -5,6 +5,9 @@
 [![Docs.rs](https://docs.rs/otpforge/badge.svg)](https://docs.rs/otpforge)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 
+
+<center><img src="https://raw.githubusercontent.com/cumulus13/otpforge/master/logo.png?raw=true" width="400" alt="Logo"></center>
+
 Secure 2FA (TOTP) secret key generator for the command line — and a small Rust library.
 Generates a secret, the `otpauth://` provisioning URI, a QR code (terminal or SVG), and single-use
 backup codes. Also computes and verifies one-time codes (RFC 4226 / RFC 6238).

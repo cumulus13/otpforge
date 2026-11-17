@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-10-29
+
+### Fixed
+- Clipboard: a tool that exits before reading its input no longer causes a spurious "Broken pipe" error (flaky test on ARM runners).
+- CI: MSRV job pins Rust 1.85.0 through the `toolchain` input so Dependabot cannot rewrite it into a non-existent toolchain.
+
 ## [0.1.9] - 2026-10-28
 
 ### Added
