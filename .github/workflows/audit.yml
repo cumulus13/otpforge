@@ -18,7 +18,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Generate lockfile (Cargo.lock is not committed)
         run: cargo generate-lockfile
       - uses: rustsec/audit-check@v2
